@@ -11,7 +11,7 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "firebaseUID", unique = true, nullable = false)
+    @Column(name = "firebase_uid", unique = true, nullable = false)
     private String firebaseUid;
 
     @Column(name = "phone_number", unique = true, nullable = false)
