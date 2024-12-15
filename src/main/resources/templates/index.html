@@ -1,71 +1,132 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Трекер автобусов</title>
-    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=YOUR_YANDEX_API_KEY" type="text/javascript"></script>
+    <title>Bus Stop Info</title>
     <style>
-        #map {
-            height: 100%;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+        }
+        select, button {
+            padding: 10px;
+            margin: 10px 0;
             width: 100%;
         }
-        body, html {
-            height: 100%;
-            margin: 0;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
         }
     </style>
+    <script>
+        async function fetchStops() {
+            const response = await fetch('http://localhost:8080/api/stops');
+            const stops = await response.json();
+            const stopSelect = document.getElementById('stopSelect');
+
+            stops.forEach(stop => {
+                const option = document.createElement('option');
+                option.value = stop.idStop;
+                option.textContent = stop.name || `Остановка ${stop.idStop}`;
+                stopSelect.appendChild(option);
+            });
+        }
+
+        async function fetchBusesForStop() {
+            const stopId = document.getElementById('stopSelect').value;
+
+            if (!stopId) return;
+
+            const busTableBody = document.getElementById('busTableBody');
+            busTableBody.innerHTML = '';
+
+            try {
+                const response = await fetch('http://localhost:8080/api/buses');
+                const buses = await response.json();
+
+                if (buses.length === 0) return;
+
+                const randomBusCount = Math.floor(Math.random() * 5) + 1; // 1 to 5 random buses
+                const randomBuses = [];
+
+                for (let i = 0; i < randomBusCount; i++) {
+                    const randomIndex = Math.floor(Math.random() * buses.length);
+                    randomBuses.push(buses[randomIndex]);
+                }
+
+                randomBuses.forEach(bus => {
+                    const row = document.createElement('tr');
+
+                    const busNumberCell = document.createElement('td');
+                    busNumberCell.textContent = bus.busNumber;
+                    row.appendChild(busNumberCell);
+
+                    const arrivalTimeCell = document.createElement('td');
+                    let arrivalTimeMinutes = Math.floor(Math.random() * 16);
+                    let arrivalTimeSeconds = Math.floor(Math.random() * 60);
+
+                    const countdown = setInterval(() => {
+                        if (arrivalTimeMinutes === 0 && arrivalTimeSeconds === 0) {
+                            clearInterval(countdown);
+                            arrivalTimeCell.textContent = "Прибыл!";
+                        } else {
+                            if (arrivalTimeSeconds === 0) {
+                                arrivalTimeMinutes--;
+                                arrivalTimeSeconds = 59;
+                            } else {
+                                arrivalTimeSeconds--;
+                            }
+                            arrivalTimeCell.textContent = `${arrivalTimeMinutes} минут ${arrivalTimeSeconds} секунд`;
+                        }
+                    }, 1000);
+
+                    row.appendChild(arrivalTimeCell);
+                    busTableBody.appendChild(row);
+                });
+
+            } catch (error) {
+                console.error('Error fetching buses:', error);
+            }
+        }
+
+        window.onload = fetchStops;
+    </script>
 </head>
 <body>
-<div id="map"></div>
-<script>
-    let map;
+<div class="container">
+    <h1>Информация об остановках</h1>
+    <label for="stopSelect">Выберите остановку:</label>
+    <select id="stopSelect" onchange="fetchBusesForStop()">
+        <option value="">-- Выберите остановку --</option>
+    </select>
 
-    // Ожидаем, пока Яндекс.Карты загрузятся
-    ymaps.ready(initMap);
-
-    // Функция инициализации карты
-    function initMap() {
-        // Инициализация карты с центром в Ростове-на-Дону
-        map = new ymaps.Map('map', {
-            center: [47.2357, 39.7015], // Центр карты - Ростов-на-Дону
-            zoom: 12
-        });
-
-        // Получаем данные об автобусах с вашего Spring Boot API
-        fetch('/api/buses')
-            .then(response => response.json())
-            .then(buses => {
-                buses.forEach(bus => {
-                    // Приводим координаты к стандартному виду, если они в микродолготе и микрошироте
-                    const latitude = bus.latitude / 1000000;
-                    const longitude = bus.longitude / 1000000;
-
-                    const busNumber = bus.busNumber;
-                    const idRoute = bus.idRoute;
-
-
-                    // Проверяем, есть ли координаты и номер автобуса
-                    if (latitude && longitude && busNumber && idRoute) {
-                        const marker = new ymaps.Placemark([latitude, longitude], {
-                            balloonContent: `Автобус №${bus.busNumber} (Маршрут: ${bus.idRoute})`
-                        });
-                        map.geoObjects.add(marker);
-
-                        // Геокодирование для получения адреса (необязательно)
-                        const geocoder = ymaps.geocode([latitude, longitude]);
-                        geocoder.then(function(res) {
-                            const address = res.geoObjects.get(0).getAddressLine();
-                            marker.properties.set('balloonContent', `Адрес: ${address}`);
-                        });
-                    } else {
-                        console.error('Недостающие данные для автобуса:', bus);
-                    }
-                });
-            })
-            .catch(error => console.error('Ошибка при получении данных о автобусах:', error));
-
-    }
-</script>
+    <table>
+        <thead>
+        <tr>
+            <th>Номер автобуса</th>
+            <th>Время прибытия</th>
+        </tr>
+        </thead>
+        <tbody id="busTableBody">
+        <!-- Автобусы будут добавляться сюда -->
+        </tbody>
+    </table>
+</div>
 </body>
 </html>

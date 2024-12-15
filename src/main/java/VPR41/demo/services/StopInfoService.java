@@ -1,6 +1,6 @@
 package VPR41.demo.services;
 
-
+import VPR41.demo.models.BusInfo;
 import VPR41.demo.models.StopInfo;
 import VPR41.demo.repository.StopInfoRepository;
 import org.springframework.stereotype.Service;
@@ -14,11 +14,16 @@ public class StopInfoService {
 
     private final StopInfoRepository stopRepository;
     private final RestTemplate restTemplate;
+
+    private final BusInfoService busInfoService;
     private final String API_URL = "https://its-rnd.ru/pikasonline/rostov/stops.txt?1732284000000";
 
-    public StopInfoService(StopInfoRepository stopRepository, RestTemplate restTemplate) {
+    private List<String> favoriteStopNames = new ArrayList<>(); // Список имен избранных остановок
+
+    public StopInfoService(StopInfoRepository stopRepository, RestTemplate restTemplate, BusInfoService busInfoService) {
         this.stopRepository = stopRepository;
         this.restTemplate = restTemplate;
+        this.busInfoService = busInfoService;
     }
 
     public List<StopInfo> getAllStops() {
@@ -28,24 +33,46 @@ public class StopInfoService {
     public void updateStopsFromApi() {
         try {
             String response = restTemplate.getForObject(API_URL, String.class);
-            if (response != null) {
-                List<StopInfo> stops = parseResponse(response);
-                stopRepository.saveAll(stops); // Сохраняем все остановки в базу
-            }
+            List<StopInfo> stops = parseResponse(response);
+            stopRepository.saveAll(stops); // Сохраняем все остановки в базу
         } catch (Exception e) {
             e.printStackTrace(); // Логируем ошибки
         }
     }
 
+    public boolean addToFavoritesByName(String stopName) {
+        List<StopInfo> allStops = stopRepository.findAll();
+        for (StopInfo stop : allStops) {
+            if (stop.getName() != null && stop.getName().equalsIgnoreCase(stopName)) {
+                if (!favoriteStopNames.contains(stopName)) {
+                    favoriteStopNames.add(stopName); // Добавляем имя остановки в избранное
+                }
+                return true;
+            }
+        }
+        return false; // Остановка не найдена
+    }
+
+    public boolean removeFromFavoritesByName(String stopName) {
+        return favoriteStopNames.removeIf(name -> name.equalsIgnoreCase(stopName));
+    }
+
+    public List<StopInfo> getFavoriteStops() {
+        return stopRepository.findAll()
+                .stream()
+                .filter(stop -> stop.getName() != null && favoriteStopNames.contains(stop.getName()))
+                .toList();
+    }
+
     private List<StopInfo> parseResponse(String response) {
         List<StopInfo> stopList = new ArrayList<>();
-        String[] lines = response.split("\n"); // Разделяем строки
+        String[] lines = response.split("\n");
 
         for (String line : lines) {
             String[] parts = line.split(";");
 
             if (parts.length < 3) {
-                System.err.println("Некорректная строка: " + line); // Логируем ошибки формата
+                System.err.println("Некорректная строка: " + line);
                 continue;
             }
 
@@ -85,5 +112,7 @@ public class StopInfoService {
         }
     }
 
-
+    public List<BusInfo> getBusesForStop(String stopId) {
+        return busInfoService.getBusesForStop(stopId);
+    }
 }

@@ -31,5 +31,6 @@ public class BusInfo {
     private Integer azimuth;
 
     private String regNumber;    // Регистрационный номер
-}
 
+    private Integer estimatedArrivalTime; // Время прибытия в минутах
+}
